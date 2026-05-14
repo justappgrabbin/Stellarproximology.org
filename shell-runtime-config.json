@@ -1,0 +1,22 @@
+{
+  "shell_mode": "resonance",
+  "runtime_preserved": true,
+  "visual_surfaces": {
+    "home": "resonance",
+    "dock": "resonance",
+    "app_center": "resonance",
+    "sandbox": "resonance",
+    "telemetry": "resonance"
+  },
+  "theme": {
+    "primary": "#c084fc",
+    "secondary": "#8b5cf6",
+    "background": "#090414",
+    "glass": true
+  },
+  "shell_behavior": {
+    "swappable": true,
+    "runtime_mutation": false,
+    "message_passing_visible": true
+  }
+}
