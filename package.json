@@ -1,0 +1,25 @@
+{
+  "name": "mrnn-symbolic-os",
+  "version": "1.0.0",
+  "description": "MRNN 5-Layer Symbolic Operating System with MCP Mobile Integration",
+  "main": "MRNN_Main.js",
+  "scripts": {
+    "start": "node MRNN_Main.js",
+    "query": "node MRNN_Main.js query",
+    "run": "node MRNN_Main.js run",
+    "evolve": "node MRNN_Main.js evolve",
+    "status": "node MRNN_Main.js status"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "keywords": [
+    "human-design",
+    "iching",
+    "symbolic-os",
+    "mcp",
+    "mobile-automation"
+  ],
+  "author": "MRNN Engine",
+  "license": "MIT"
+}
