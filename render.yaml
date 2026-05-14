@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: autonomous-emergence-app
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: AUTONOMY_MODE
+        value: ordered
+      - key: MAX_AUTONOMY_LEVEL
+        value: "0.72"
