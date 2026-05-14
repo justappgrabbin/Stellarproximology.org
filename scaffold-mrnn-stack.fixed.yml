@@ -1,0 +1,1657 @@
+name: Scaffold MRNN Stack
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      seed_hexagram:
+        description: 'Seed hexagram (1-64) for MRNN initialization'
+        required: false
+        default: '1'
+      deploy_target:
+        description: 'Deploy target (netlify / render / none)'
+        required: false
+        default: 'netlify'
+
+jobs:
+  scaffold-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      # ─────────────────────────────────────────
+      # 1. CHECKOUT & SETUP
+      # ─────────────────────────────────────────
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install numpy scipy networkx
+          npm install -g netlify-cli
+
+      # ─────────────────────────────────────────
+      # 2. SCAFFOLD DIRECTORY TREE
+      # ─────────────────────────────────────────
+      - name: Scaffold project structure
+        run: |
+          mkdir -p src/{mrnn,orchestrator,web,shared}
+          mkdir -p src/mrnn/{gates,channels,schedulers}
+          mkdir -p src/orchestrator/{agents,protocols,callbacks}
+          mkdir -p src/web/{components,pages,assets,styles}
+          mkdir -p src/shared/{types,utils,constants}
+          mkdir -p tests/{unit,integration}
+          mkdir -p .github/workflows
+          mkdir -p docs
+          mkdir -p scripts
+          echo "✓ Directory tree scaffolded"
+
+      # ─────────────────────────────────────────
+      # 3. GENERATE MRNN ENGINE
+      # ─────────────────────────────────────────
+      - name: Generate MRNN Engine
+        run: |
+          cat > src/mrnn/engine.py << 'PYEOF'
+          #!/usr/bin/env python3
+          """
+          MRNN - Magnetite Resonance Neural Network
+          5-Layer Symbolic Neural Engine
+          64 Gates | 6 Lines | 6 Tones | 6 Colors | 36 Channels
+          Fuxi Encoding | Fibonacci Scheduling | Monopole Routing
+          """
+          
+          import numpy as np
+          import math
+          from collections import defaultdict
+          from typing import Dict, List, Tuple, Any, Optional
+          from dataclasses import dataclass, field
+          from enum import Enum, auto
+          
+          # ─────────────────────────────────────────
+          # CONSTANTS & ENUMS
+          # ─────────────────────────────────────────
+          
+          class Layer(Enum):
+              INGEST = 1    # Signal reception
+              ANALYZE = 2   # Gate activation
+              ADDRESS = 3   # Monopole routing
+              SEND = 4      # Fibonacci scheduling
+              EXECUTE = 5   # Autonomous callback
+          
+          class Tone(Enum):
+              ABSTRACT = 1
+              CONCRETE = 2
+              NOMADIC = 3
+              PASSIVE = 4
+              AGGRESSIVE = 5
+              MUTATIVE = 6
+          
+          class Color(Enum):
+              NOURISHMENT = 1
+              MANAGEMENT = 2
+              IMAGINATION = 3
+              IDEAS = 4
+              POWER = 5
+              DOUBT = 6
+          
+          # 64 Gates with I Ching mappings
+          GATES = {
+              1: "Creative", 2: "Receptive", 3: "Difficulty", 4: "Folly",
+              5: "Waiting", 6: "Conflict", 7: "Army", 8: "Union",
+              9: "Taming", 10: "Treading", 11: "Peace", 12: "Standstill",
+              13: "Fellowship", 14: "Possession", 15: "Modesty", 16: "Enthusiasm",
+              17: "Following", 18: "Work", 19: "Approach", 20: "Contemplation",
+              21: "Biting", 22: "Grace", 23: "Splitting", 24: "Return",
+              25: "Innocence", 26: "Taming Power", 27: "Nourishing", 28: "Preponderance",
+              29: "Abysmal", 30: "Clinging", 31: "Influence", 32: "Duration",
+              33: "Retreat", 34: "Power", 35: "Progress", 36: "Darkening",
+              37: "Family", 38: "Opposition", 39: "Obstruction", 40: "Deliverance",
+              41: "Decrease", 42: "Increase", 43: "Breakthrough", 44: "Coming",
+              45: "Gathering", 46: "Pushing Upward", 47: "Exhaustion", 48: "Well",
+              49: "Revolution", 50: "Cauldron", 51: "Shock", 52: "Keeping Still",
+              53: "Development", 54: "Marrying", 55: "Abundance", 56: "Wanderer",
+              57: "Gentle", 58: "Joyous", 59: "Dispersion", 60: "Limitation",
+              61: "Inner Truth", 62: "Small Preponderance", 63: "After Completion", 64: "Before Completion"
+          }
+          
+          # 36 Channels (gate pairs)
+          CHANNELS = [
+              (1, 8), (2, 14), (3, 60), (4, 63), (5, 15), (6, 59),
+              (7, 31), (9, 52), (10, 20), (11, 56), (12, 22), (13, 33),
+              (16, 48), (17, 62), (18, 58), (19, 49), (21, 45), (23, 43),
+              (24, 61), (25, 51), (26, 44), (27, 50), (28, 38), (29, 46),
+              (30, 41), (32, 54), (34, 57), (35, 36), (37, 40), (39, 55),
+              (42, 53), (47, 64), (10, 34), (20, 57), (28, 46), (44, 26)
+          ]
+          
+          # Fibonacci sequence for scheduling
+          FIB = [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144]
+          
+          # ─────────────────────────────────────────
+          # FUXI ENCODER
+          # ─────────────────────────────────────────
+          
+          class FuxiEncoder:
+              """Binary encoding using Fuxi trigram ordering"""
+          
+              TRIGRAMS = {
+                  '☰': (1, 1, 1),  # Heaven
+                  '☱': (1, 1, 0),  # Lake
+                  '☲': (1, 0, 1),  # Fire
+                  '☳': (1, 0, 0),  # Thunder
+                  '☴': (0, 1, 1),  # Wind
+                  '☵': (0, 1, 0),  # Water
+                  '☶': (0, 0, 1),  # Mountain
+                  '☷': (0, 0, 0),  # Earth
+              }
+          
+              def __init__(self):
+                  self.trigram_list = list(self.TRIGRAMS.keys())
+          
+              def char_to_trigrams(self, char: str) -> Tuple[str, str]:
+                  """Map character to two trigrams (upper/lower)"""
+                  code = ord(char) % 64
+                  upper_idx = code // 8
+                  lower_idx = code % 8
+                  return (self.trigram_list[upper_idx], self.trigram_list[lower_idx])
+          
+              def encode(self, signal: str) -> List[Tuple[int, int, int, int, int, int]]:
+                  """Encode string to 6-line binary vectors"""
+                  encoded = []
+                  for char in signal:
+                      upper, lower = self.char_to_trigrams(char)
+                      u_bits = self.TRIGRAMS[upper]
+                      l_bits = self.TRIGRAMS[lower]
+                      encoded.append(u_bits + l_bits)
+                  return encoded
+          
+              def decode(self, vectors: List[Tuple]) -> str:
+                  """Decode vectors back to string"""
+                  result = []
+                  for vec in vectors:
+                      upper_bits = vec[:3]
+                      lower_bits = vec[3:]
+                      upper_idx = list(self.TRIGRAMS.values()).index(upper_bits)
+                      lower_idx = list(self.TRIGRAMS.values()).index(lower_bits)
+                      code = upper_idx * 8 + lower_idx
+                      result.append(chr(code + 32))  # Offset to printable
+                  return ''.join(result)
+          
+          # ─────────────────────────────────────────
+          # GATE STRUCTURE
+          # ─────────────────────────────────────────
+          
+          @dataclass
+          class Gate:
+              number: int
+              name: str
+              line: int
+              tone: Tone
+              color: Color
+              base: float  # 0-360 degrees
+              activated: bool = False
+              charge: float = 0.0
+              connections: List[int] = field(default_factory=list)
+          
+              def activate(self, intensity: float = 1.0):
+                  self.activated = True
+                  self.charge = min(1.0, self.charge + intensity)
+                  return self
+          
+              def discharge(self, amount: float = 0.1):
+                  self.charge = max(0.0, self.charge - amount)
+                  if self.charge < 0.01:
+                      self.activated = False
+                  return self
+          
+          # ─────────────────────────────────────────
+          # MONOPOLE ROUTER
+          # ─────────────────────────────────────────
+          
+          class MonopoleRouter:
+              """Routes signals through magnetic monopole topology"""
+          
+              def __init__(self):
+                  self.topology = self._build_topology()
+                  self.active_paths = []
+          
+              def _build_topology(self) -> Dict[int, List[int]]:
+                  """Build monopole routing graph"""
+                  topology = defaultdict(list)
+                  # Connect gates based on tone/color resonance
+                  for g1 in range(1, 65):
+                      for g2 in range(g1 + 1, 65):
+                          # Resonance: same tone or complementary color
+                          t1 = ((g1 - 1) % 6) + 1
+                          t2 = ((g2 - 1) % 6) + 1
+                          c1 = ((g1 - 1) % 6) + 1
+                          c2 = ((g2 - 1) % 6) + 1
+          
+                          if t1 == t2 or (c1 + c2) == 7:  # Complementary colors sum to 7
+                              topology[g1].append(g2)
+                              topology[g2].append(g1)
+                  return dict(topology)
+          
+              def route(self, signal: str, target: str = "HEART") -> List[int]:
+                  """Find path from signal origin to target"""
+                  # Hash signal to starting gate
+                  start_gate = (hash(signal) % 64) + 1
+                  target_gate = (hash(target) % 64) + 1
+          
+                  # BFS for shortest path
+                  visited = set()
+                  queue = [(start_gate, [start_gate])]
+          
+                  while queue:
+                      current, path = queue.pop(0)
+                      if current == target_gate:
+                          self.active_paths.append(path)
+                          return path
+          
+                      visited.add(current)
+                      for neighbor in self.topology.get(current, []):
+                          if neighbor not in visited:
+                              queue.append((neighbor, path + [neighbor]))
+          
+                  return [start_gate]  # Fallback
+          
+              def get_resonance_field(self, active_gates: List[int]) -> np.ndarray:
+                  """Calculate resonance field from active gates"""
+                  field = np.zeros(64)
+                  for g in active_gates:
+                      if 1 <= g <= 64:
+                          field[g - 1] = 1.0
+                          # Spread to neighbors
+                          for neighbor in self.topology.get(g, []):
+                              field[neighbor - 1] += 0.3
+                  return field / (np.max(field) + 1e-10)
+          
+          # ─────────────────────────────────────────
+          # FIBONACCI SCHEDULER
+          # ─────────────────────────────────────────
+          
+          class FibonacciScheduler:
+              """Schedules transmissions using Fibonacci timing"""
+          
+              def __init__(self):
+                  self.sequence = FIB
+                  self.tick = 0
+                  self.schedule = defaultdict(list)
+          
+              def schedule_event(self, event_id: str, priority: int):
+                  """Schedule event at next Fibonacci interval"""
+                  fib_idx = min(priority, len(self.sequence) - 1)
+                  interval = self.sequence[fib_idx]
+                  execute_at = self.tick + interval
+                  self.schedule[execute_at].append({
+                      'id': event_id,
+                      'priority': priority,
+                      'scheduled': self.tick
+                  })
+                  return execute_at
+          
+              def tick_forward(self) -> List[Dict]:
+                  """Advance one tick, return due events"""
+                  self.tick += 1
+                  due = self.schedule.pop(self.tick, [])
+                  return due
+          
+              def get_wait_time(self, event_id: str) -> int:
+                  """Get remaining wait time for event"""
+                  for tick, events in self.schedule.items():
+                      for e in events:
+                          if e['id'] == event_id:
+                              return tick - self.tick
+                  return -1
+          
+          # ─────────────────────────────────────────
+          # WHO TRANSLATORS
+          # ─────────────────────────────────────────
+          
+          class WhoTranslator:
+              """Translates between 5 Who perspectives"""
+          
+              WHO_MODES = ['OBSERVER', 'PARTICIPANT', 'WITNESS', 'AGENT', 'ORACLE']
+          
+              def __init__(self):
+                  self.mode = 'OBSERVER'
+                  self.memory = defaultdict(list)
+          
+              def translate(self, signal: Dict, target_who: str) -> Dict:
+                  """Translate signal to target Who perspective"""
+                  if target_who not in self.WHO_MODES:
+                      target_who = 'OBSERVER'
+          
+                  translated = {
+                      'who': target_who,
+                      'source': signal,
+                      'timestamp': self._get_timestamp(),
+                      'layer': signal.get('layer', 'UNKNOWN')
+                  }
+          
+                  # Perspective-specific processing
+                  if target_who == 'ORACLE':
+                      translated['prediction'] = self._oracular_read(signal)
+                  elif target_who == 'AGENT':
+                      translated['action'] = self._agentic_response(signal)
+                  elif target_who == 'WITNESS':
+                      translated['record'] = self._witness_log(signal)
+          
+                  self.memory[target_who].append(translated)
+                  return translated
+          
+              def _get_timestamp(self):
+                  import time
+                  return time.time()
+          
+              def _oracular_read(self, signal):
+                  gates = signal.get('gates', [])
+                  if not gates:
+                      return "Void"
+                  return f"Gate {gates[0]} opens the way to {GATES.get(gates[0], 'Unknown')}"
+          
+              def _agentic_response(self, signal):
+                  return {'execute': True, 'target': signal.get('target', 'SELF')}
+          
+              def _witness_log(self, signal):
+                  return {'observed': signal, 'archived': True}
+          
+          # ─────────────────────────────────────────
+          # MAIN MRNN ENGINE
+          # ─────────────────────────────────────────
+          
+          class MRNN:
+              """5-Layer Magnetite Resonance Neural Network"""
+          
+              def __init__(self, seed_hexagram: int = 1):
+                  self.seed = max(1, min(64, seed_hexagram))
+                  self.encoder = FuxiEncoder()
+                  self.router = MonopoleRouter()
+                  self.scheduler = FibonacciScheduler()
+                  self.translator = WhoTranslator()
+          
+                  self.gates = self._init_gates()
+                  self.channels = self._init_channels()
+                  self.state = {
+                      'layer': Layer.INGEST,
+                      'active_gates': [],
+                      'open_channels': [],
+                      'resonance_field': np.zeros(64),
+                      'history': []
+                  }
+          
+              def _init_gates(self) -> Dict[int, Gate]:
+                  """Initialize all 64 gates"""
+                  gates = {}
+                  for i in range(1, 65):
+                      line = ((i - 1) % 6) + 1
+                      tone_val = ((i - 1) % 6) + 1
+                      color_val = ((i - 1) % 6) + 1
+                      base = ((i - 1) * 5.625) % 360  # 360/64 = 5.625 degrees per gate
+          
+                      gates[i] = Gate(
+                          number=i,
+                          name=GATES[i],
+                          line=line,
+                          tone=Tone(tone_val),
+                          color=Color(color_val),
+                          base=base,
+                          connections=[]
+                      )
+                  return gates
+          
+              def _init_channels(self) -> List[Tuple[int, int]]:
+                  """Initialize 36 channels"""
+                  return CHANNELS
+          
+              def ingest(self, signal: str) -> Dict:
+                  """Layer 1: Receive and encode signal"""
+                  self.state['layer'] = Layer.INGEST
+          
+                  # Fuxi encode
+                  encoded = self.encoder.encode(signal)
+          
+                  # Map to gates
+                  gate_activations = []
+                  for vec in encoded:
+                      # Convert 6-bit vector to gate number
+                      gate_num = sum(b * (2 ** i) for i, b in enumerate(reversed(vec))) % 64 + 1
+                      self.gates[gate_num].activate(0.5)
+                      gate_activations.append(gate_num)
+          
+                  self.state['active_gates'] = list(set(gate_activations))
+          
+                  return {
+                      'layer': 'INGEST',
+                      'signal': signal,
+                      'encoded': encoded,
+                      'gates_activated': self.state['active_gates']
+                  }
+          
+              def analyze(self) -> Dict:
+                  """Layer 2: Analyze gate activations and open channels"""
+                  self.state['layer'] = Layer.ANALYZE
+          
+                  active = self.state['active_gates']
+                  open_channels = []
+          
+                  # Check which channels are connected by active gates
+                  for ch in self.channels:
+                      if ch[0] in active or ch[1] in active:
+                          open_channels.append(ch)
+                          # Strengthen connected gates
+                          self.gates[ch[0]].activate(0.3)
+                          self.gates[ch[1]].activate(0.3)
+          
+                  self.state['open_channels'] = open_channels
+          
+                  return {
+                      'layer': 'ANALYZE',
+                      'active_gates': active,
+                      'channels_opened': open_channels,
+                      'resonance': len(open_channels)
+                  }
+          
+              def address(self, target: str = "HEART") -> Dict:
+                  """Layer 3: Route through monopole topology"""
+                  self.state['layer'] = Layer.ADDRESS
+          
+                  paths = []
+                  for gate in self.state['active_gates']:
+                      path = self.router.route(str(gate), target)
+                      paths.append(path)
+          
+                  # Update resonance field
+                  self.state['resonance_field'] = self.router.get_resonance_field(
+                      self.state['active_gates']
+                  )
+          
+                  return {
+                      'layer': 'ADDRESS',
+                      'paths': paths,
+                      'target': target,
+                      'field_strength': float(np.mean(self.state['resonance_field']))
+                  }
+          
+              def send(self, priority: int = 3) -> Dict:
+                  """Layer 4: Schedule transmission via Fibonacci"""
+                  self.state['layer'] = Layer.SEND
+          
+                  transmissions = []
+                  for gate in self.state['active_gates']:
+                      tx_id = f"TX_{gate}_{self.scheduler.tick}"
+                      execute_at = self.scheduler.schedule_event(tx_id, priority)
+                      transmissions.append({
+                          'id': tx_id,
+                          'gate': gate,
+                          'execute_at': execute_at,
+                          'tone': self.gates[gate].tone.name,
+                          'color': self.gates[gate].color.name
+                      })
+          
+                  return {
+                      'layer': 'SEND',
+                      'transmissions': transmissions,
+                      'tick': self.scheduler.tick
+                  }
+          
+              def execute(self, who: str = "AGENT") -> Dict:
+                  """Layer 5: Execute with Who translation"""
+                  self.state['layer'] = Layer.EXECUTE
+          
+                  # Process due events
+                  due_events = self.scheduler.tick_forward()
+          
+                  # Translate state to Who perspective
+                  signal = {
+                      'layer': 'EXECUTE',
+                      'gates': self.state['active_gates'],
+                      'channels': self.state['open_channels'],
+                      'field': self.state['resonance_field'].tolist(),
+                      'events': due_events
+                  }
+          
+                  translated = self.translator.translate(signal, who)
+          
+                  # Record history
+                  self.state['history'].append({
+                      'tick': self.scheduler.tick,
+                      'signal': signal,
+                      'translation': translated
+                  })
+          
+                  # Discharge gates slightly
+                  for g in self.state['active_gates']:
+                      self.gates[g].discharge(0.2)
+          
+                  return {
+                      'layer': 'EXECUTE',
+                      'who': who,
+                      'translation': translated,
+                      'events_processed': len(due_events),
+                      'active_gates': [g for g in self.state['active_gates'] if self.gates[g].activated]
+                  }
+          
+              def cycle(self, signal: str, target: str = "HEART", who: str = "AGENT") -> Dict:
+                  """Run full 5-layer cycle"""
+                  result = {
+                      'INGEST': self.ingest(signal),
+                      'ANALYZE': self.analyze(),
+                      'ADDRESS': self.address(target),
+                      'SEND': self.send(),
+                      'EXECUTE': self.execute(who)
+                  }
+                  return result
+          
+              def get_state(self) -> Dict:
+                  """Get current engine state"""
+                  return {
+                      'seed': self.seed,
+                      'layer': self.state['layer'].name,
+                      'active_gates': self.state['active_gates'],
+                      'open_channels': self.state['open_channels'],
+                      'resonance_field': self.state['resonance_field'].tolist(),
+                      'tick': self.scheduler.tick,
+                      'history_depth': len(self.state['history'])
+                  }
+          
+          
+          # ─────────────────────────────────────────
+          # CLI INTERFACE
+          # ─────────────────────────────────────────
+          
+          if __name__ == "__main__":
+              import sys
+              import json
+          
+              # Default demo
+              seed = int(sys.argv[1]) if len(sys.argv) > 1 else 1
+              signal = sys.argv[2] if len(sys.argv) > 2 else "BB"
+          
+              print(f"🧠 MRNN Boot [Seed: {seed} | Signal: '{signal}']")
+              print("=" * 50)
+          
+              net = MRNN(seed_hexagram=seed)
+              result = net.cycle(signal)
+          
+              for layer, data in result.items():
+                  print(f"\n🔹 {layer}")
+                  if isinstance(data, dict):
+                      for k, v in data.items():
+                          if k != 'field':  # Skip large arrays
+                              print(f"   {k}: {v}")
+          
+              print(f"\n📊 Final State: {json.dumps(net.get_state(), indent=2)}")
+          
+          PYEOF
+          echo "✓ MRNN Engine generated"
+
+      # ─────────────────────────────────────────
+      # 4. GENERATE AUTONOMOUS ORCHESTRATOR
+      # ─────────────────────────────────────────
+      - name: Generate Autonomous Orchestrator
+        run: |
+          cat > src/orchestrator/orchestrator.py << 'PYEOF'
+          #!/usr/bin/env python3
+          """
+          Autonomous Orchestrator
+          5-Phase Cycle: INGEST → ANALYZE → ADDRESS → SEND → EXECUTE
+          With autonomous callbacks to external services
+          """
+          
+          import asyncio
+          import json
+          import time
+          import threading
+          from typing import Dict, List, Callable, Optional
+          from dataclasses import dataclass, field
+          from datetime import datetime
+          from queue import Queue
+          import sys, os
+          
+          # Add parent to path
+          sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+          from mrnn.engine import MRNN, Layer
+          
+          @dataclass
+          class CallbackConfig:
+              """Configuration for external callbacks"""
+              render_url: str = "https://synthia-server.onrender.com"
+              supabase_url: str = ""
+              supabase_key: str = ""
+              webhook_secret: str = ""
+              retry_attempts: int = 3
+              timeout: float = 30.0
+          
+          @dataclass  
+          class AgentState:
+              """State of an autonomous agent"""
+              id: str
+              phase: str = "IDLE"
+              mrnn_state: Dict = field(default_factory=dict)
+              callbacks_fired: List[str] = field(default_factory=list)
+              last_active: float = 0.0
+              alive: bool = True
+          
+          class AutonomousOrchestrator:
+              """
+              Autonomous Orchestrator with 5-phase cycle
+              - Ingests signals
+              - Analyzes via MRNN
+              - Addresses targets
+              - Sends to callbacks
+              - Executes autonomously
+              """
+          
+              PHASES = ['INGEST', 'ANALYZE', 'ADDRESS', 'SEND', 'EXECUTE']
+          
+              def __init__(self, mrnn: Optional[MRNN] = None, config: Optional[CallbackConfig] = None):
+                  self.mrnn = mrnn or MRNN(seed_hexagram=1)
+                  self.config = config or CallbackConfig()
+          
+                  self.agents: Dict[str, AgentState] = {}
+                  self.message_queue: Queue = Queue()
+                  self.callbacks: Dict[str, Callable] = {}
+                  self.running = False
+                  self.thread: Optional[threading.Thread] = None
+          
+                  # Register default callbacks
+                  self._register_default_callbacks()
+          
+              def _register_default_callbacks(self):
+                  """Register built-in callback handlers"""
+                  self.callbacks['render'] = self._callback_render
+                  self.callbacks['supabase'] = self._callback_supabase
+                  self.callbacks['log'] = self._callback_log
+                  self.callbacks['morph'] = self._callback_morph
+          
+              def _callback_render(self, data: Dict) -> Dict:
+                  """Callback to Render server"""
+                  try:
+                      import requests
+                      url = f"{self.config.render_url}/api/orchestrator"
+                      response = requests.post(
+                          url, 
+                          json=data, 
+                          timeout=self.config.timeout,
+                          headers={'Content-Type': 'application/json'}
+                      )
+                      return {
+                          'status': 'success' if response.status_code == 200 else 'error',
+                          'code': response.status_code,
+                          'response': response.text[:200]
+                      }
+                  except Exception as e:
+                      return {'status': 'error', 'message': str(e)}
+          
+              def _callback_supabase(self, data: Dict) -> Dict:
+                  """Callback to Supabase"""
+                  if not self.config.supabase_url:
+                      return {'status': 'skipped', 'reason': 'no_supabase_config'}
+                  try:
+                      import requests
+                      url = f"{self.config.supabase_url}/rest/v1/orchestrator_logs"
+                      headers = {
+                          'apikey': self.config.supabase_key,
+                          'Authorization': f'Bearer {self.config.supabase_key}',
+                          'Content-Type': 'application/json'
+                      }
+                      response = requests.post(url, json=data, headers=headers)
+                      return {
+                          'status': 'success' if response.status_code in [200, 201] else 'error',
+                          'code': response.status_code
+                      }
+                  except Exception as e:
+                      return {'status': 'error', 'message': str(e)}
+          
+              def _callback_log(self, data: Dict) -> Dict:
+                  """Local logging callback"""
+                  timestamp = datetime.now().isoformat()
+                  entry = f"[{timestamp}] {data.get('phase', 'UNKNOWN')}: {json.dumps(data, default=str)[:200]}"
+                  print(f"📝 {entry}")
+                  return {'status': 'logged', 'entry': entry}
+          
+              def _callback_morph(self, data: Dict) -> Dict:
+                  """Morphing/visualization callback"""
+                  # Generate morph state for web frontend
+                  morph_state = {
+                      'nodes': data.get('active_gates', []),
+                      'edges': data.get('channels', []),
+                      'field': data.get('resonance_field', []),
+                      'timestamp': time.time()
+                  }
+                  return {'status': 'morphed', 'state': morph_state}
+          
+              def boot(self):
+                  """Boot the orchestrator"""
+                  print("🚀 Autonomous Orchestrator Booting...")
+                  self.running = True
+                  self.thread = threading.Thread(target=self._run_loop, daemon=True)
+                  self.thread.start()
+                  print("✓ Orchestrator active")
+                  return self
+          
+              def shutdown(self):
+                  """Graceful shutdown"""
+                  print("🛑 Shutting down...")
+                  self.running = False
+                  if self.thread:
+                      self.thread.join(timeout=5.0)
+                  print("✓ Orchestrator stopped")
+          
+              def _run_loop(self):
+                  """Main orchestration loop"""
+                  while self.running:
+                      try:
+                          # Process queued messages
+                          if not self.message_queue.empty():
+                              msg = self.message_queue.get(timeout=1.0)
+                              self._process_message(msg)
+                          else:
+                              # Autonomous heartbeat
+                              self._heartbeat()
+                              time.sleep(1.0)
+                      except Exception as e:
+                          print(f"⚠️ Loop error: {e}")
+                          time.sleep(1.0)
+          
+              def _heartbeat(self):
+                  """Autonomous heartbeat - keeps system alive"""
+                  for agent_id, agent in self.agents.items():
+                      if agent.alive and (time.time() - agent.last_active) > 30:
+                          # Agent stale, trigger reactivation
+                          self._process_message({
+                              'target': agent_id,
+                              'signal': 'HEARTBEAT',
+                              'phase': 'INGEST'
+                          })
+          
+              def _process_message(self, msg: Dict):
+                  """Process a single message through 5 phases"""
+                  agent_id = msg.get('target', 'default')
+          
+                  # Create agent if new
+                  if agent_id not in self.agents:
+                      self.agents[agent_id] = AgentState(id=agent_id)
+          
+                  agent = self.agents[agent_id]
+                  agent.last_active = time.time()
+          
+                  # Determine phase
+                  start_phase = msg.get('phase', 'INGEST')
+                  phase_idx = self.PHASES.index(start_phase) if start_phase in self.PHASES else 0
+          
+                  signal = msg.get('signal', 'PING')
+                  result = {}
+          
+                  # Run phases
+                  for i in range(phase_idx, len(self.PHASES)):
+                      phase = self.PHASES[i]
+                      agent.phase = phase
+          
+                      if phase == 'INGEST':
+                          result = self.mrnn.ingest(signal)
+                      elif phase == 'ANALYZE':
+                          result = self.mrnn.analyze()
+                      elif phase == 'ADDRESS':
+                          target = msg.get('address_target', 'HEART')
+                          result = self.mrnn.address(target)
+                      elif phase == 'SEND':
+                          result = self.mrnn.send()
+                          # Fire callbacks
+                          self._fire_callbacks(agent_id, result)
+                      elif phase == 'EXECUTE':
+                          who = msg.get('who', 'AGENT')
+                          result = self.mrnn.execute(who)
+          
+                      # Store state
+                      agent.mrnn_state[phase] = result
+          
+                  agent.phase = 'IDLE'
+          
+              def _fire_callbacks(self, agent_id: str, data: Dict):
+                  """Fire all registered callbacks"""
+                  agent = self.agents[agent_id]
+          
+                  for name, callback in self.callbacks.items():
+                      try:
+                          result = callback(data)
+                          agent.callbacks_fired.append(f"{name}:{result.get('status', 'unknown')}")
+                      except Exception as e:
+                          agent.callbacks_fired.append(f"{name}:error:{str(e)}")
+          
+              def cycle(self, signal: str, **kwargs) -> Dict:
+                  """Run a full cycle synchronously"""
+                  msg = {
+                      'target': kwargs.get('agent', 'default'),
+                      'signal': signal,
+                      'phase': 'INGEST',
+                      'address_target': kwargs.get('target', 'HEART'),
+                      'who': kwargs.get('who', 'AGENT')
+                  }
+                  # Process synchronously so tests and CLI callers get a completed state.
+                  self._process_message(msg)
+          
+                  agent = self.agents.get(msg['target'])
+                  if agent:
+                      return {
+                          'phase': agent.phase,
+                          'agent': agent.id,
+                          'state': agent.mrnn_state,
+                          'callbacks': agent.callbacks_fired[-5:]  # Last 5
+                      }
+                  return {'status': 'pending'}
+          
+              def get_status(self) -> Dict:
+                  """Get orchestrator status"""
+                  return {
+                      'running': self.running,
+                      'agents': len(self.agents),
+                      'queue_depth': self.message_queue.qsize(),
+                      'callbacks': list(self.callbacks.keys()),
+                      'mrnn_state': self.mrnn.get_state()
+                  }
+          
+          # ─────────────────────────────────────────
+          # CLI
+          # ─────────────────────────────────────────
+          
+          if __name__ == "__main__":
+              import sys
+          
+              print("🎯 Autonomous Orchestrator")
+              print("=" * 40)
+          
+              orch = AutonomousOrchestrator()
+              orch.boot()
+          
+              # Demo cycle
+              signal = sys.argv[1] if len(sys.argv) > 1 else "LOVE"
+              print(f"\n📡 Processing signal: '{signal}'")
+          
+              result = orch.cycle(signal)
+              print(f"\n📊 Result:")
+              print(json.dumps(result, indent=2, default=str))
+          
+              print(f"\n📈 Status: {json.dumps(orch.get_status(), indent=2, default=str)}")
+          
+              orch.shutdown()
+          
+          PYEOF
+          echo "✓ Orchestrator generated"
+
+      # ─────────────────────────────────────────
+      # 5. GENERATE WEB INTERFACE
+      # ─────────────────────────────────────────
+      - name: Generate Web Interface
+        run: |
+          cat > src/web/index.html << 'HTMLEOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>MRNN | 5-Layer Neural Engine</title>
+              <style>
+                  * { margin: 0; padding: 0; box-sizing: border-box; }
+          
+                  :root {
+                      --bg: #0a0a0f;
+                      --fg: #e0e0ff;
+                      --accent: #00d4aa;
+                      --accent2: #ff0066;
+                      --gate: #1a1a2e;
+                      --channel: #16213e;
+                      --layer1: #00d4aa;
+                      --layer2: #00a8e8;
+                      --layer3: #7b2cbf;
+                      --layer4: #ff0066;
+                      --layer5: #ffaa00;
+                  }
+          
+                  body {
+                      background: var(--bg);
+                      color: var(--fg);
+                      font-family: 'Courier New', monospace;
+                      min-height: 100vh;
+                      overflow-x: hidden;
+                  }
+          
+                  .header {
+                      padding: 20px 40px;
+                      border-bottom: 1px solid #1a1a2e;
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                  }
+          
+                  .logo {
+                      font-size: 24px;
+                      font-weight: bold;
+                      background: linear-gradient(90deg, var(--layer1), var(--layer3), var(--layer5));
+                      -webkit-background-clip: text;
+                      -webkit-text-fill-color: transparent;
+                  }
+          
+                  .status {
+                      display: flex;
+                      gap: 20px;
+                      font-size: 12px;
+                  }
+          
+                  .status-dot {
+                      width: 8px;
+                      height: 8px;
+                      border-radius: 50%;
+                      background: var(--accent);
+                      animation: pulse 2s infinite;
+                  }
+          
+                  @keyframes pulse {
+                      0%, 100% { opacity: 1; }
+                      50% { opacity: 0.3; }
+                  }
+          
+                  .main {
+                      display: grid;
+                      grid-template-columns: 300px 1fr 300px;
+                      gap: 20px;
+                      padding: 20px;
+                      height: calc(100vh - 80px);
+                  }
+          
+                  .panel {
+                      background: rgba(26, 26, 46, 0.6);
+                      border: 1px solid #1a1a2e;
+                      border-radius: 12px;
+                      padding: 20px;
+                      overflow-y: auto;
+                  }
+          
+                  .panel h3 {
+                      font-size: 14px;
+                      text-transform: uppercase;
+                      letter-spacing: 2px;
+                      margin-bottom: 15px;
+                      color: var(--accent);
+                  }
+          
+                  .layer-stack {
+                      display: flex;
+                      flex-direction: column;
+                      gap: 10px;
+                  }
+          
+                  .layer {
+                      padding: 15px;
+                      border-radius: 8px;
+                      border-left: 4px solid;
+                      transition: all 0.3s;
+                      cursor: pointer;
+                  }
+          
+                  .layer:hover { transform: translateX(5px); }
+          
+                  .layer.active { 
+                      background: rgba(255,255,255,0.05);
+                      box-shadow: 0 0 20px rgba(0,212,170,0.1);
+                  }
+          
+                  .layer-1 { border-color: var(--layer1); }
+                  .layer-2 { border-color: var(--layer2); }
+                  .layer-3 { border-color: var(--layer3); }
+                  .layer-4 { border-color: var(--layer4); }
+                  .layer-5 { border-color: var(--layer5); }
+          
+                  .layer-name {
+                      font-weight: bold;
+                      font-size: 13px;
+                  }
+          
+                  .layer-desc {
+                      font-size: 11px;
+                      opacity: 0.6;
+                      margin-top: 4px;
+                  }
+          
+                  .viz-canvas {
+                      width: 100%;
+                      height: 400px;
+                      background: radial-gradient(ellipse at center, #0f0f23 0%, #0a0a0f 100%);
+                      border-radius: 12px;
+                      position: relative;
+                      overflow: hidden;
+                  }
+          
+                  .gate-grid {
+                      display: grid;
+                      grid-template-columns: repeat(8, 1fr);
+                      gap: 4px;
+                      margin-top: 15px;
+                  }
+          
+                  .gate-cell {
+                      aspect-ratio: 1;
+                      background: var(--gate);
+                      border-radius: 4px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      font-size: 10px;
+                      cursor: pointer;
+                      transition: all 0.3s;
+                      border: 1px solid transparent;
+                  }
+          
+                  .gate-cell:hover { 
+                      border-color: var(--accent);
+                      transform: scale(1.1);
+                  }
+          
+                  .gate-cell.active {
+                      background: var(--accent);
+                      color: var(--bg);
+                      box-shadow: 0 0 10px var(--accent);
+                  }
+          
+                  .input-section {
+                      margin-top: 20px;
+                  }
+          
+                  .signal-input {
+                      width: 100%;
+                      padding: 12px;
+                      background: var(--gate);
+                      border: 1px solid #1a1a2e;
+                      border-radius: 8px;
+                      color: var(--fg);
+                      font-family: inherit;
+                      font-size: 14px;
+                      outline: none;
+                  }
+          
+                  .signal-input:focus {
+                      border-color: var(--accent);
+                  }
+          
+                  .btn {
+                      width: 100%;
+                      padding: 12px;
+                      margin-top: 10px;
+                      background: linear-gradient(90deg, var(--layer1), var(--layer2));
+                      border: none;
+                      border-radius: 8px;
+                      color: var(--bg);
+                      font-family: inherit;
+                      font-weight: bold;
+                      cursor: pointer;
+                      transition: all 0.3s;
+                  }
+          
+                  .btn:hover {
+                      transform: translateY(-2px);
+                      box-shadow: 0 5px 20px rgba(0,212,170,0.3);
+                  }
+          
+                  .log-stream {
+                      font-size: 11px;
+                      line-height: 1.6;
+                      max-height: 300px;
+                      overflow-y: auto;
+                  }
+          
+                  .log-entry {
+                      padding: 4px 0;
+                      border-bottom: 1px solid rgba(255,255,255,0.05);
+                  }
+          
+                  .log-time { color: var(--accent); }
+                  .log-layer-1 { color: var(--layer1); }
+                  .log-layer-2 { color: var(--layer2); }
+                  .log-layer-3 { color: var(--layer3); }
+                  .log-layer-4 { color: var(--layer4); }
+                  .log-layer-5 { color: var(--layer5); }
+          
+                  .resonance-bar {
+                      height: 4px;
+                      background: linear-gradient(90deg, var(--layer1), var(--layer5));
+                      border-radius: 2px;
+                      margin-top: 10px;
+                      animation: shimmer 2s infinite;
+                  }
+          
+                  @keyframes shimmer {
+                      0% { opacity: 0.5; }
+                      50% { opacity: 1; }
+                      100% { opacity: 0.5; }
+                  }
+          
+                  @media (max-width: 1200px) {
+                      .main { grid-template-columns: 1fr; }
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="header">
+                  <div class="logo">◈ MRNN ENGINE</div>
+                  <div class="status">
+                      <span><span class="status-dot"></span> 64 Gates Active</span>
+                      <span>36 Channels Open</span>
+                      <span>5 Layers Online</span>
+                  </div>
+              </div>
+          
+              <div class="main">
+                  <div class="panel">
+                      <h3>◈ Layer Stack</h3>
+                      <div class="layer-stack">
+                          <div class="layer layer-1 active" data-layer="1">
+                              <div class="layer-name">01 INGEST</div>
+                              <div class="layer-desc">Signal reception & Fuxi encoding</div>
+                          </div>
+                          <div class="layer layer-2" data-layer="2">
+                              <div class="layer-name">02 ANALYZE</div>
+                              <div class="layer-desc">Gate activation & channel mapping</div>
+                          </div>
+                          <div class="layer layer-3" data-layer="3">
+                              <div class="layer-name">03 ADDRESS</div>
+                              <div class="layer-desc">Monopole routing & tone assignment</div>
+                          </div>
+                          <div class="layer layer-4" data-layer="4">
+                              <div class="layer-name">04 SEND</div>
+                              <div class="layer-desc">Fibonacci scheduling & color transmission</div>
+                          </div>
+                          <div class="layer layer-5" data-layer="5">
+                              <div class="layer-name">05 EXECUTE</div>
+                              <div class="layer-desc">Autonomous callback & morph deployment</div>
+                          </div>
+                      </div>
+          
+                      <div class="input-section">
+                          <h3>◈ Signal Input</h3>
+                          <input type="text" class="signal-input" id="signalInput" placeholder="Enter signal (e.g., LOVE, BB)..." value="BB">
+                          <button class="btn" onclick="processSignal()">◈ CYCLE</button>
+                      </div>
+                  </div>
+          
+                  <div class="panel">
+                      <h3>◈ Resonance Field</h3>
+                      <div class="viz-canvas" id="vizCanvas">
+                          <canvas id="fieldCanvas" width="800" height="400"></canvas>
+                      </div>
+          
+                      <h3 style="margin-top:20px">◈ Gate Matrix (64)</h3>
+                      <div class="gate-grid" id="gateGrid"></div>
+          
+                      <div class="resonance-bar"></div>
+                  </div>
+          
+                  <div class="panel">
+                      <h3>◈ Orchestrator Log</h3>
+                      <div class="log-stream" id="logStream">
+                          <div class="log-entry"><span class="log-time">[INIT]</span> System boot...</div>
+                      </div>
+          
+                      <h3 style="margin-top:20px">◈ Active Channels</h3>
+                      <div id="channelList" style="font-size:11px; opacity:0.7;">
+                          Waiting for signal...
+                      </div>
+                  </div>
+              </div>
+          
+              <script>
+                  // ─────────────────────────────────────────
+                  // MRNN WEB CLIENT
+                  // ─────────────────────────────────────────
+          
+                  const GATES = 64;
+                  const LAYERS = 5;
+                  let activeGates = new Set();
+                  let currentLayer = 1;
+                  let resonanceField = new Array(64).fill(0);
+          
+                  // Initialize gate grid
+                  function initGateGrid() {
+                      const grid = document.getElementById('gateGrid');
+                      for (let i = 1; i <= GATES; i++) {
+                          const cell = document.createElement('div');
+                          cell.className = 'gate-cell';
+                          cell.textContent = i;
+                          cell.dataset.gate = i;
+                          cell.onclick = () => toggleGate(i);
+                          grid.appendChild(cell);
+                      }
+                  }
+          
+                  function toggleGate(n) {
+                      const cell = document.querySelector(`[data-gate="${n}"]`);
+                      if (activeGates.has(n)) {
+                          activeGates.delete(n);
+                          cell.classList.remove('active');
+                      } else {
+                          activeGates.add(n);
+                          cell.classList.add('active');
+                      }
+                      updateField();
+                  }
+          
+                  // Canvas visualization
+                  function initCanvas() {
+                      const canvas = document.getElementById('fieldCanvas');
+                      const ctx = canvas.getContext('2d');
+          
+                      function draw() {
+                          ctx.fillStyle = '#0a0a0f';
+                          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          
+                          // Draw resonance field as circular visualization
+                          const cx = canvas.width / 2;
+                          const cy = canvas.height / 2;
+                          const radius = 120;
+          
+                          // Background rings
+                          for (let r = 40; r <= 160; r += 40) {
+                              ctx.beginPath();
+                              ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                              ctx.strokeStyle = `rgba(0, 212, 170, ${0.1 - r/2000})`;
+                              ctx.lineWidth = 1;
+                              ctx.stroke();
+                          }
+          
+                          // Active gates as points
+                          activeGates.forEach(gate => {
+                              const angle = (gate / 64) * Math.PI * 2 - Math.PI / 2;
+                              const dist = radius + (resonanceField[gate-1] * 60);
+                              const x = cx + Math.cos(angle) * dist;
+                              const y = cy + Math.sin(angle) * dist;
+          
+                              // Gate glow
+                              const gradient = ctx.createRadialGradient(x, y, 0, x, y, 20);
+                              gradient.addColorStop(0, 'rgba(0, 212, 170, 0.8)');
+                              gradient.addColorStop(1, 'rgba(0, 212, 170, 0)');
+                              ctx.fillStyle = gradient;
+                              ctx.fillRect(x - 20, y - 20, 40, 40);
+          
+                              // Gate point
+                              ctx.beginPath();
+                              ctx.arc(x, y, 4, 0, Math.PI * 2);
+                              ctx.fillStyle = '#00d4aa';
+                              ctx.fill();
+                          });
+          
+                          // Connecting lines between active gates
+                          const gates = Array.from(activeGates);
+                          ctx.strokeStyle = 'rgba(0, 168, 232, 0.2)';
+                          ctx.lineWidth = 1;
+                          for (let i = 0; i < gates.length; i++) {
+                              for (let j = i + 1; j < gates.length; j++) {
+                                  const a1 = (gates[i] / 64) * Math.PI * 2 - Math.PI / 2;
+                                  const a2 = (gates[j] / 64) * Math.PI * 2 - Math.PI / 2;
+                                  const x1 = cx + Math.cos(a1) * radius;
+                                  const y1 = cy + Math.sin(a1) * radius;
+                                  const x2 = cx + Math.cos(a2) * radius;
+                                  const y2 = cy + Math.sin(a2) * radius;
+                                  ctx.beginPath();
+                                  ctx.moveTo(x1, y1);
+                                  ctx.lineTo(x2, y2);
+                                  ctx.stroke();
+                              }
+                          }
+          
+                          requestAnimationFrame(draw);
+                      }
+          
+                      draw();
+                  }
+          
+                  function updateField() {
+                      // Simple field update based on active gates
+                      resonanceField = resonanceField.map((v, i) => {
+                          if (activeGates.has(i + 1)) return 1.0;
+                          return Math.max(0, v - 0.05);
+                      });
+                  }
+          
+                  // Logging
+                  function log(msg, layer = 0) {
+                      const stream = document.getElementById('logStream');
+                      const entry = document.createElement('div');
+                      entry.className = 'log-entry';
+                      const time = new Date().toLocaleTimeString();
+                      const layerClass = layer > 0 ? `log-layer-${layer}` : '';
+                      entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="${layerClass}">${msg}</span>`;
+                      stream.appendChild(entry);
+                      stream.scrollTop = stream.scrollHeight;
+                  }
+          
+                  // Layer animation
+                  function activateLayer(n) {
+                      document.querySelectorAll('.layer').forEach(l => l.classList.remove('active'));
+                      document.querySelector(`[data-layer="${n}"]`).classList.add('active');
+                      currentLayer = n;
+                  }
+          
+                  // Process signal through layers
+                  async function processSignal() {
+                      const signal = document.getElementById('signalInput').value || 'BB';
+                      log(`Processing signal: "${signal}"`, 1);
+          
+                      // Layer 1: INGEST
+                      activateLayer(1);
+                      log('Fuxi encoding...', 1);
+                      await wait(500);
+          
+                      // Hash to gates
+                      const encoded = signal.split('').map(c => c.charCodeAt(0) % 64 + 1);
+                      encoded.forEach(g => activeGates.add(g));
+                      updateGateGrid();
+                      log(`Gates activated: ${Array.from(activeGates).join(', ')}`, 1);
+          
+                      // Layer 2: ANALYZE
+                      activateLayer(2);
+                      log('Analyzing channel resonance...', 2);
+                      await wait(600);
+                      const channels = findChannels(Array.from(activeGates));
+                      document.getElementById('channelList').innerHTML = channels.map(c => 
+                          `<div>◈ Gate ${c[0]} ↔ Gate ${c[1]}</div>`
+                      ).join('');
+                      log(`Channels opened: ${channels.length}`, 2);
+          
+                      // Layer 3: ADDRESS
+                      activateLayer(3);
+                      log('Monopole routing...', 3);
+                      await wait(500);
+          
+                      // Layer 4: SEND
+                      activateLayer(4);
+                      log('Fibonacci scheduling...', 4);
+                      await wait(500);
+          
+                      // Layer 5: EXECUTE
+                      activateLayer(5);
+                      log('Executing callbacks...', 5);
+                      await wait(400);
+                      log('Cycle complete.', 5);
+          
+                      // Reset to idle
+                      setTimeout(() => activateLayer(1), 2000);
+                  }
+          
+                  function findChannels(gates) {
+                      const channels = [
+                          [1,8],[2,14],[3,60],[4,63],[5,15],[6,59],
+                          [7,31],[9,52],[10,20],[11,56],[12,22],[13,33],
+                          [16,48],[17,62],[18,58],[19,49],[21,45],[23,43],
+                          [24,61],[25,51],[26,44],[27,50],[28,38],[29,46],
+                          [30,41],[32,54],[34,57],[35,36],[37,40],[39,55],
+                          [42,53],[47,64],[10,34],[20,57],[28,46],[44,26]
+                      ];
+                      return channels.filter(c => gates.includes(c[0]) || gates.includes(c[1]));
+                  }
+          
+                  function updateGateGrid() {
+                      document.querySelectorAll('.gate-cell').forEach(cell => {
+                          const g = parseInt(cell.dataset.gate);
+                          cell.classList.toggle('active', activeGates.has(g));
+                      });
+                  }
+          
+                  function wait(ms) {
+                      return new Promise(r => setTimeout(r, ms));
+                  }
+          
+                  // Boot
+                  initGateGrid();
+                  initCanvas();
+                  log('MRNN Engine initialized');
+                  log('64 gates | 36 channels | 5 layers');
+                  log('Ready for signal input...');
+              </script>
+          </body>
+          </html>
+          HTMLEOF
+          echo "✓ Web interface generated"
+
+      # ─────────────────────────────────────────
+      # 6. GENERATE PACKAGE MANIFESTS
+      # ─────────────────────────────────────────
+      - name: Generate package files
+        run: |
+          cat > package.json << 'JSONEOF'
+          {
+            "name": "mrnn-orchestrator-stack",
+            "version": "1.0.0",
+            "description": "5-Layer Symbolic Neural Engine + Autonomous Orchestrator",
+            "main": "src/web/index.html",
+            "scripts": {
+              "start": "python -m http.server 8080 --directory src/web",
+              "test": "python -m pytest tests/",
+              "mrnn": "python src/mrnn/engine.py",
+              "orchestrate": "python src/orchestrator/orchestrator.py",
+              "build": "echo 'Static site ready in src/web/'",
+              "deploy:netlify": "netlify deploy --prod --dir=src/web",
+              "deploy:render": "echo 'Push to Render via Git integration'"
+            },
+            "dependencies": {},
+            "devDependencies": {
+              "netlify-cli": "^17.0.0"
+            },
+            "repository": {
+              "type": "git",
+              "url": "git+https://github.com/${{ github.repository }}.git"
+            },
+            "keywords": ["mrnn", "neural-network", "orchestrator", "human-design", "iching"],
+            "license": "MIT"
+          }
+          JSONEOF
+
+          cat > requirements.txt << 'REQEOF'
+          numpy>=1.24.0
+          scipy>=1.10.0
+          networkx>=3.1
+          pytest>=7.4.0
+          requests>=2.31.0
+          websocket-client>=1.6.0
+          REQEOF
+
+          cat > .gitignore << 'GITEOF'
+          __pycache__/
+          *.pyc
+          .env
+          node_modules/
+          .DS_Store
+          *.log
+          dist/
+          build/
+          GITEOF
+
+          echo "✓ Package manifests generated"
+
+      # ─────────────────────────────────────────
+      # 7. GENERATE TESTS
+      # ─────────────────────────────────────────
+      - name: Generate test suite
+        run: |
+          cat > tests/unit/test_mrnn.py << 'TESTEOF'
+          import unittest, sys, os
+          sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../src'))
+          from mrnn.engine import MRNN, FuxiEncoder, MonopoleRouter
+          
+          class TestMRNN(unittest.TestCase):
+              def test_initialization(self):
+                  net = MRNN(seed_hexagram=1)
+                  self.assertEqual(len(net.gates), 64)
+                  self.assertEqual(len(net.channels), 36)
+          
+              def test_fuxi_encoding(self):
+                  encoder = FuxiEncoder()
+                  code = encoder.encode("BB")
+                  self.assertIsInstance(code, list)
+                  self.assertEqual(len(code), 2)
+          
+              def test_signal_flow(self):
+                  net = MRNN(seed_hexagram=1)
+                  result = net.ingest("TEST")
+                  self.assertIn("gates_activated", result)
+                  self.assertTrue(len(result["gates_activated"]) > 0)
+          
+              def test_monopole_routing(self):
+                  router = MonopoleRouter()
+                  path = router.route("LOVE", target="HEART")
+                  self.assertIsInstance(path, list)
+                  self.assertTrue(len(path) > 0)
+          
+              def test_full_cycle(self):
+                  net = MRNN(seed_hexagram=1)
+                  result = net.cycle("LOVE")
+                  self.assertIn("INGEST", result)
+                  self.assertIn("EXECUTE", result)
+                  self.assertEqual(result["EXECUTE"]["who"], "AGENT")
+          
+          if __name__ == '__main__':
+              unittest.main()
+          TESTEOF
+
+          cat > tests/integration/test_stack.py << 'INTEOF'
+          import unittest, sys, os
+          sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../src'))
+          from mrnn.engine import MRNN
+          from orchestrator.orchestrator import AutonomousOrchestrator
+          
+          class TestIntegration(unittest.TestCase):
+              def test_end_to_end(self):
+                  net = MRNN(seed_hexagram=1)
+                  orch = AutonomousOrchestrator(mrnn=net)
+                  orch.boot()
+          
+                  # Ingest -> Analyze -> Address -> Send -> Execute
+                  result = orch.cycle("INIT")
+                  self.assertEqual(result["phase"], "IDLE")  # After cycle completes
+                  self.assertTrue(len(result["callbacks"]) > 0)
+          
+              def test_orchestrator_status(self):
+                  net = MRNN(seed_hexagram=1)
+                  orch = AutonomousOrchestrator(mrnn=net)
+                  status = orch.get_status()
+                  self.assertIn("running", status)
+                  self.assertIn("agents", status)
+          
+          if __name__ == '__main__':
+              unittest.main()
+          INTEOF
+
+          echo "✓ Test suite generated"
+
+      # ─────────────────────────────────────────
+      # 8. GENERATE README
+      # ─────────────────────────────────────────
+      - name: Generate documentation
+        run: |
+          cat > README.md << 'MDEOF'
+          # MRNN + Autonomous Orchestrator Stack
+          
+          5-Layer Symbolic Neural Engine with autonomous orchestration.
+          
+          ## Architecture
+          
+          ```
+          Layer 1: INGEST   → Signal reception & Fuxi encoding
+          Layer 2: ANALYZE  → Gate activation & channel mapping  
+          Layer 3: ADDRESS  → Monopole routing & tone assignment
+          Layer 4: SEND     → Fibonacci scheduling & color transmission
+          Layer 5: EXECUTE  → Autonomous callback & morph deployment
+          ```
+          
+          ## Quick Start
+          
+          ```bash
+          # Install dependencies
+          pip install -r requirements.txt
+          
+          # Run MRNN engine
+          python src/mrnn/engine.py
+          
+          # Boot orchestrator
+          python src/orchestrator/orchestrator.py
+          
+          # Start web interface
+          npm start
+          ```
+          
+          ## GitHub Actions
+          
+          This repo auto-scaffolds on every push to `main`. 
+          Manual trigger available with configurable seed hexagram.
+          
+          ## Deploy
+          
+          - **Netlify**: `npm run deploy:netlify`
+          - **Render**: Connect repo in Render dashboard
+          - **GitHub Pages**: Enabled automatically
+          
+          ## Structure
+          
+          ```
+          src/
+            mrnn/           → Neural engine (64 gates, 36 channels)
+            orchestrator/   → Autonomous orchestrator with callbacks
+            web/            → Browser interface with visualization
+            shared/         → Types, utils, constants
+          tests/
+            unit/           → MRNN unit tests
+            integration/    → End-to-end stack tests
+          ```
+          MDEOF
+
+          echo "✓ Documentation generated"
+
+      # ─────────────────────────────────────────
+      # 9. COMMIT SCAFFOLDED FILES
+      # ─────────────────────────────────────────
+      - name: Commit scaffolded code
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "🧠 Auto-scaffold: MRNN + Orchestrator + Web stack [skip ci]"
+          git push
+
+      # ─────────────────────────────────────────
+      # 10. RUN TESTS
+      # ─────────────────────────────────────────
+      - name: Run test suite
+        run: |
+          pip install -r requirements.txt
+          python -m pytest tests/ -v
+
+      # ─────────────────────────────────────────
+      # 11. DEPLOY (conditional)
+      # ─────────────────────────────────────────
+      - name: Deploy to Netlify
+        if: github.event.inputs.deploy_target == 'netlify' || github.event_name == 'push'
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          netlify deploy --prod --dir=src/web --message "Auto-deploy from GitHub Actions"
+
+      - name: Trigger Render Deploy
+        if: github.event.inputs.deploy_target == 'render'
+        run: |
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}" || echo "Render hook not configured"
